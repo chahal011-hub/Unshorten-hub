@@ -2,13 +2,13 @@ import os
 import requests
 import telebot
 
-# आपका बॉट टोकन
+# 1. आपका बॉट टोकन
 BOT_TOKEN = "9230801222:AAELbvk_AC4LOPsM6q747NromJcalHOFldI"
 
-# आपकी असली Telegram ID (आप Admin हैं)
+# 2. आपकी असली Telegram ID (Admin)
 ADMIN_ID = 8417306426
 
-# आपका सीक्रेट पासवर्ड (दूसरों के लिए)
+# 3. आपका सीक्रेट पासवर्ड
 SECRET_CODE = "kaushal123"
 
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -17,8 +17,30 @@ approved_users = {ADMIN_ID}
 
 def unshorten_url(url):
   try:
-    response = requests.get(url, allow_redirects=True, timeout=10, stream=True)
-    return response.url
+    # ब्राउज़र की तरह दिखने के लिए हेडर जोड़ रहे हैं ताकि शॉर्टनर ब्लॉक न करे
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,"
+            " like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept": (
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+        ),
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+
+    session = requests.Session()
+    response = session.get(
+        url, headers=headers, allow_redirects=True, timeout=15
+    )
+
+    # अगर बीच में कोई रीडायरेक्ट हिस्ट्री है तो आखिरी और सही URL निकालें
+    if response.history:
+      final_url = response.url
+      return final_url
+    else:
+      return response.url
+
   except Exception as e:
     return f"लिंक चेक करने में समस्या आई: {str(e)}"
 
@@ -29,14 +51,13 @@ def send_welcome(message):
   if user_id in approved_users:
     bot.reply_to(
         message,
-        "नमस्ते मालिक! 👋\nआप वेरिफाइड हैं। मुझे कोई भी शॉर्ट लिंक भेजें, मैं असली"
-        " लिंक ढूंढ कर दे दूंगा।",
+        "नमस्ते मालिक! 👋\nबॉट अपडेट हो गया है। कोई भी शॉर्ट लिंक भेजें!",
     )
   else:
     bot.reply_to(
         message,
-        "🔒 **प्राइवेट बॉट!**\nइस बॉट को इस्तेमाल करने के लिए आपके पास यूनिक कोड"
-        " होना चाहिए।\n\nकृपया इस तरह कमांड भेजें:\n`/auth kaushal123`",
+        "🔒 **प्राइवेट बॉट!**\nयूनिक कोड भेजने के लिए कमांड दें:\n`/auth"
+        " kaushal123`",
         parse_mode="Markdown",
     )
 
@@ -52,22 +73,16 @@ def authenticate_user(message):
   except IndexError:
     bot.reply_to(
         message,
-        "⚠️ कृपया सही फॉर्मेट में लिखें। उदाहरण:\n`/auth kaushal123`",
+        "⚠️ सही फॉर्मेट में लिखें। उदाहरण:\n`/auth kaushal123`",
         parse_mode="Markdown",
     )
     return
 
   if entered_code == SECRET_CODE:
     approved_users.add(user_id)
-    bot.reply_to(
-        message,
-        "🎉 **बधाई हो!**\nपरमिशन मिल गई है। अब आप इस बॉट का इस्तेमाल कर सकते"
-        " हैं। कोई भी लिंक भेजें!",
-    )
+    bot.reply_to(message, "🎉 परमिशन मिल गई है! अब लिंक भेजें।")
   else:
-    bot.reply_to(
-        message, "❌ गलत कोड! कृपया सही यूनिक कोड दर्ज करें।"
-    )
+    bot.reply_to(message, "❌ गलत कोड!")
 
 
 @bot.message_handler(func=lambda message: True)
@@ -76,28 +91,23 @@ def handle_message(message):
 
   if user_id not in approved_users:
     bot.reply_to(
-        message,
-        "🚫 आपके पास इस बॉट को इस्तेमाल करने की परमिशन नहीं है!\nकृपया पहले"
-        " `/auth kaushal123` लिखकर एक्सेस लें።",
+        message, "🚫 परमिशन नहीं है! पहले `/auth kaushal123` भेजें।"
     )
     return
 
   text = message.text.strip()
   if text.startswith("http://") or text.startswith("https://"):
-    wait_msg = bot.reply_to(message, "⏳ लिंक चेक किया जा रहा है...")
+    wait_msg = bot.reply_to(message, "⏳ लिंक बाईपास किया जा रहा है...")
     final_url = unshorten_url(text)
     bot.edit_message_text(
         chat_id=message.chat.id,
         message_id=wait_msg.message_id,
-        text=f"✅ **असली लिंक:**\n`{final_url}`",
+        text=f"✅ **नतीजा / असली लिंक:**\n`{final_url}`",
         parse_mode="Markdown",
     )
   else:
-    bot.reply_to(
-        message,
-        "⚠️ कृपया एक सही URL भेजें जो `http://` या `https://` से शुरू होता हो।",
-    )
+    bot.reply_to(message, "⚠️ कृपया सही URL (`http://` या `https://`) भेजें।")
 
 
-print("Secured Bot with Auth Code is running...")
+print("Advanced Unshortener Bot is running...")
 bot.infinity_polling()
